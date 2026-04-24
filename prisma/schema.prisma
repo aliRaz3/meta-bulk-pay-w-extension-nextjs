@@ -7,56 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model adaccount {
-  id              String   @id
-  name            String
-  accountStatus   Int
-  currency        String   @default("USD")
-  balance         Float    @default(0)
-  disableReason   Int?
-  bmId            String
-  bmName          String
-  url             String   @db.Text
-  result          String   @default("pending")
-  paidVerified    Boolean  @default(false)
-  extensionResult String?
-  extensionDetail String?  @db.Text
-  sessionId       String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-  business        business @relation(fields: [bmId], references: [id], onDelete: Cascade, map: "AdAccount_bmId_fkey")
-  session         session  @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "AdAccount_sessionId_fkey")
-
-  @@index([bmId], map: "AdAccount_bmId_idx")
-  @@index([sessionId], map: "AdAccount_sessionId_idx")
-}
-
 model business {
-  id        String      @id
-  name      String
-  sessionId String
-  selected  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime
-  adaccount adaccount[]
-  session   session     @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "Business_sessionId_fkey")
+  id             String   @id
+  name           String
+  sessionId      String
+  selected       Boolean  @default(true)
+  adAccountCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  session        session  @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "Business_sessionId_fkey")
 
   @@index([sessionId], map: "Business_sessionId_idx")
 }
 
 model session {
-  id          String      @id
+  id          String     @id
   userId      String
   userName    String
-  token       String      @db.Text
+  token       String     @db.Text
   appId       String
   ip          String?
-  userAgent   String?     @db.Text
+  userAgent   String?    @db.Text
   lastLoginAt DateTime?
-  cookies     String?     @db.LongText
-  createdAt   DateTime    @default(now())
+  cookies     String?    @db.LongText
+  createdAt   DateTime   @default(now())
   updatedAt   DateTime
-  adaccount   adaccount[]
   business    business[]
 
   @@unique([userId, appId], map: "Session_userId_appId_key")

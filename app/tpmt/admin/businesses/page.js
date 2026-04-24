@@ -6,14 +6,12 @@ import AdminHeader from "../components/AdminHeader";
 
 const PAGE_SIZE = 20;
 const SORTABLE_COLS = [
-  { key: "userName", label: "User" },
-  { key: "userId", label: "User ID" },
-  { key: "appId", label: "App ID" },
-  { key: "ip", label: "IP" },
+  { key: "name", label: "Name" },
   { key: "createdAt", label: "Created" },
+  { key: "updatedAt", label: "Updated" },
 ];
 
-function SessionsTable() {
+function BusinessesTable() {
   const router = useRouter();
 
   const [rows, setRows] = useState([]);
@@ -39,11 +37,11 @@ function SessionsTable() {
     setError("");
     try {
       const q = new URLSearchParams({ page: p, search: s, sortBy: sb, sortDir: sd }).toString();
-      const res = await fetch(`/api/admin/sessions?${q}`, { signal: ctrl.signal });
+      const res = await fetch(`/api/admin/businesses?${q}`, { signal: ctrl.signal });
       if (res.status === 401) { router.replace("/tpmt/admin"); return; }
-      if (!res.ok) throw new Error("Failed to load sessions");
+      if (!res.ok) throw new Error("Failed to load businesses");
       const data = await res.json();
-      setRows(data.sessions);
+      setRows(data.businesses);
       setTotal(data.total);
     } catch (e) {
       if (e.name !== "AbortError") setError(e.message);
@@ -84,19 +82,19 @@ function SessionsTable() {
       <AdminHeader onLogout={handleLogout} />
 
       <div style={S.container}>
-        <Breadcrumb crumbs={[{ label: "Sessions" }]} />
+        <Breadcrumb crumbs={[{ label: "Businesses" }]} />
 
         {error && <div style={S.errorBox}>{error}</div>}
 
         <div style={S.tableWrap}>
           <div style={S.tableToolbar}>
-            <span style={S.tableTitle}>Sessions</span>
+            <span style={S.tableTitle}>All Businesses</span>
             <span style={S.tableCount}>{total} total</span>
             <div style={{ flex: 1 }} />
             <form onSubmit={handleSearch} style={{ display: "flex", gap: 6 }}>
               <input
                 style={S.searchInput}
-                placeholder="Search name, user ID, app ID, IP…"
+                placeholder="Search name, BM ID, user…"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -113,23 +111,23 @@ function SessionsTable() {
                   {SORTABLE_COLS.map((col) => (
                     <SortTh key={col.key} col={col.key} sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>{col.label}</SortTh>
                   ))}
-                  <Th>BMs</Th>
-                  <Th>Accounts</Th>
+                  <Th>BM ID</Th>
+                  <Th>Ad Accounts</Th>
+                  <Th>User</Th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && rows.length === 0 && (
-                  <tr><td colSpan={7} style={S.empty}>No sessions found</td></tr>
+                  <tr><td colSpan={6} style={S.empty}>No businesses found</td></tr>
                 )}
-                {rows.map((s) => (
-                  <tr key={s.id} style={S.tr} onClick={() => router.push(`/tpmt/admin/sessions/${s.id}`)}>
-                    <Td><strong>{s.userName}</strong></Td>
-                    <Td><code style={S.mono}>{s.userId}</code></Td>
-                    <Td><code style={S.mono}>{s.appId}</code></Td>
-                    <Td>{s.ip || "—"}</Td>
-                    <Td style={{ whiteSpace: "nowrap", fontSize: 11, color: "#8d949e" }}>{new Date(s.createdAt).toLocaleString()}</Td>
-                    <Td>{s._count.business}</Td>
-                    <Td>{s.adAccountCount}</Td>
+                {rows.map((bm) => (
+                  <tr key={bm.id} style={S.tr} onClick={() => router.push(`/tpmt/admin/sessions/${bm.session.id}/business/${bm.id}`)}>
+                    <Td><strong>{bm.name}</strong></Td>
+                    <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.createdAt).toLocaleString()}</Td>
+                    <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.updatedAt).toLocaleString()}</Td>
+                    <Td><code style={S.mono}>{bm.id}</code></Td>
+                    <Td>{bm.adAccountCount}</Td>
+                    <Td>{bm.session.userName}</Td>
                   </tr>
                 ))}
               </tbody>
@@ -143,8 +141,8 @@ function SessionsTable() {
   );
 }
 
-export default function SessionsPage() {
-  return <Suspense><SessionsTable /></Suspense>;
+export default function BusinessesPage() {
+  return <Suspense><BusinessesTable /></Suspense>;
 }
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -179,11 +177,6 @@ function Pagination({ page, totalPages, onPage }) {
     const n = parseInt(inputVal, 10);
     if (Number.isFinite(n) && n >= 1 && n <= totalPages) onPage(n);
     else setInputVal(String(page));
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === "Enter") commitInput();
-    else if (e.key === "Escape") setInputVal(String(page));
   }
 
   const WING = 2;
@@ -226,7 +219,7 @@ function Pagination({ page, totalPages, onPage }) {
         value={inputVal}
         onChange={(e) => setInputVal(e.target.value)}
         onBlur={commitInput}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => { if (e.key === "Enter") commitInput(); else if (e.key === "Escape") setInputVal(String(page)); }}
         title="Go to page"
       />
       <span style={S.pageOf}>/ {totalPages}</span>

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 
 const PAGE_SIZE = 20;
-const SORTABLE = ["userName", "userId", "appId", "ip", "createdAt", "updatedAt"];
+const SORTABLE = ["name", "createdAt", "updatedAt"];
 
 export async function GET(request) {
   if (!(await isAdminAuthenticated())) {
@@ -19,42 +19,36 @@ export async function GET(request) {
 
   const where = search
     ? {
-      OR: [
-        { userName: { contains: search } },
-        { userId: { contains: search } },
-        { appId: { contains: search } },
-        { ip: { contains: search } },
-      ],
-    }
+        OR: [
+          { name: { contains: search } },
+          { id: { contains: search } },
+          { session: { userName: { contains: search } } },
+        ],
+      }
     : {};
 
-  const [total, sessions] = await Promise.all([
-    prisma.session.count({ where }),
-    prisma.session.findMany({
+  const [total, businesses] = await Promise.all([
+    prisma.business.count({ where }),
+    prisma.business.findMany({
       where,
       skip,
       take: PAGE_SIZE,
       orderBy: { [sortBy]: sortDir },
       select: {
         id: true,
-        userId: true,
-        userName: true,
-        appId: true,
-        ip: true,
-        userAgent: true,
-        lastLoginAt: true,
+        name: true,
+        adAccountCount: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { business: true } },
-        business: { select: { adAccountCount: true } },
+        session: {
+          select: {
+            id: true,
+            userName: true,
+          },
+        },
       },
     }),
   ]);
 
-  const sessionsWithCount = sessions.map(({ business, ...s }) => ({
-    ...s,
-    adAccountCount: business.reduce((sum, b) => sum + b.adAccountCount, 0),
-  }));
-
-  return NextResponse.json({ sessions: sessionsWithCount, total, page, pageSize: PAGE_SIZE });
+  return NextResponse.json({ businesses, total, page, pageSize: PAGE_SIZE });
 }

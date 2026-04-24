@@ -17,6 +17,11 @@ function dispatchResponse(detail) {
   window.dispatchEvent(new CustomEvent(RESPONSE_EVENT, { detail }));
 }
 
+function isContextInvalidated(error) {
+  return error?.message?.includes('Extension context invalidated') ||
+    error?.message?.includes('context invalidated');
+}
+
 window.addEventListener(COMMAND_EVENT, async (event) => {
   const detail = event?.detail || {};
   const requestId = detail.requestId;
@@ -40,6 +45,16 @@ window.addEventListener(COMMAND_EVENT, async (event) => {
 
     dispatchResponse({ requestId, ok: true, response });
   } catch (error) {
+    if (isContextInvalidated(error)) {
+      // Extension was reloaded or updated — this content script is stale.
+      // Stop responding to further commands; user must refresh the page.
+      dispatchResponse({
+        requestId,
+        ok: false,
+        error: 'Extension was reloaded. Please refresh this page to reconnect.',
+      });
+      return;
+    }
     dispatchResponse({
       requestId,
       ok: false,
@@ -49,7 +64,17 @@ window.addEventListener(COMMAND_EVENT, async (event) => {
 });
 
 window.addEventListener(PING_EVENT, () => {
-  dispatchReady();
+  try {
+    // Guard against pinging after context is invalidated
+    if (!chrome.runtime?.id) return;
+    dispatchReady();
+  } catch (_) {
+    // Context already gone — silently stop responding to pings
+  }
 });
 
-dispatchReady();
+try {
+  dispatchReady();
+} catch (_) {
+  // Ignore if context is already invalid on initial inject
+}

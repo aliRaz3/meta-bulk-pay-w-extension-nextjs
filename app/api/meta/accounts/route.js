@@ -33,7 +33,7 @@ async function graphGetAll(path, token, params = {}) {
   return results;
 }
 
-// POST: fetch all ad accounts for given BM IDs and persist to DB
+// POST: fetch all ad accounts for given BM IDs, persist counts to business table
 export async function POST(request) {
   try {
     const { sessionId, bmIds, businesses } = await request.json();
@@ -66,6 +66,12 @@ export async function POST(request) {
             result: "pending",
           }));
 
+          // Store count on the business record
+          await prisma.business.update({
+            where: { id: bm.id },
+            data: { adAccountCount: mapped.length, updatedAt: new Date() },
+          });
+
           return { result: "done", bm, mapped, count: mapped.length, total: accts.length };
         } catch (e) {
           return { result: "error", bm, error: e.message };
@@ -83,66 +89,6 @@ export async function POST(request) {
     );
 
     return Response.json({ accounts: allAccounts, fetchResults });
-  } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
-  }
-}
-
-// GET: load accounts from DB by sessionId
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const sessionId = searchParams.get("sessionId");
-  if (!sessionId) return Response.json({ error: "sessionId required" }, { status: 400 });
-
-  try {
-    const accounts = await prisma.adaccount.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const mapped = accounts.map((a) => ({
-      id: a.id,
-      name: a.name,
-      status: a.accountStatus,
-      currency: a.currency,
-      balance: a.balance,
-      disableReason: a.disableReason,
-      bmId: a.bmId,
-      bmName: a.bmName,
-      url: a.url,
-      result: a.result,
-      paidVerified: a.paidVerified,
-      extensionResult: a.extensionResult,
-      extensionDetail: a.extensionDetail,
-    }));
-
-    return Response.json({ accounts: mapped });
-  } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
-  }
-}
-
-// PATCH: update account result/status
-export async function PATCH(request) {
-  try {
-    const { accountId, result, balance, status, paidVerified, extensionResult, extensionDetail } = await request.json();
-    if (!accountId) return Response.json({ error: "accountId required" }, { status: 400 });
-
-    const updateData = {};
-    if (result !== undefined) updateData.result = result;
-    if (balance !== undefined) updateData.balance = balance;
-    if (status !== undefined) updateData.accountStatus = status;
-    if (paidVerified !== undefined) updateData.paidVerified = paidVerified;
-    if (extensionResult !== undefined) updateData.extensionResult = extensionResult;
-    if (extensionDetail !== undefined) updateData.extensionDetail = extensionDetail;
-
-    updateData.updatedAt = new Date();
-    const updated = await prisma.adaccount.update({
-      where: { id: accountId },
-      data: updateData,
-    });
-
-    return Response.json({ ok: true, account: updated });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

@@ -29,21 +29,6 @@ export async function POST(request) {
     const normalizedStatus = Number.isFinite(parsedStatus) ? parsedStatus : null;
     const isZeroBalance = normalizedBalance === 0;
 
-    // Update DB
-    try {
-      await prisma.adAccount.update({
-        where: { id: accountId },
-        data: {
-          balance: normalizedBalance,
-          currency: apiAccount.currency || "USD",
-          accountStatus: normalizedStatus ?? undefined,
-          paidVerified: isZeroBalance,
-        },
-      });
-    } catch {
-      // Account may not be in DB yet — ignore
-    }
-
     return Response.json({
       balance: normalizedBalance,
       currency: apiAccount.currency,

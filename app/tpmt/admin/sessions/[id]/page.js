@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams } from "next/navigation";
+import AdminHeader from "../../components/AdminHeader";
 
 const PAGE_SIZE = 20;
 const SORTABLE_COLS = [
@@ -79,9 +80,14 @@ function SessionDetail() {
     setStale(true);
   }
 
+  async function handleLogout() {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    router.replace("/tpmt/admin");
+  }
+
   return (
     <div style={S.page}>
-      <AdminHeader />
+      <AdminHeader onLogout={handleLogout} />
 
       {sessionError && (
         <div style={S.container}><div style={S.errorBox}>{sessionError}</div></div>
@@ -160,7 +166,7 @@ function SessionDetail() {
                         <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.createdAt).toLocaleString()}</Td>
                         <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.updatedAt).toLocaleString()}</Td>
                         <Td><code style={S.mono}>{bm.id}</code></Td>
-                        <Td>{bm._count.adaccount}</Td>
+                        <Td>{bm.adAccountCount}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -186,18 +192,6 @@ export default function SessionDetailPage() {
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
-function AdminHeader() {
-  const router = useRouter();
-  return (
-    <div style={S.header}>
-      <div style={S.headerInner}>
-        <button style={S.adminBrand} onClick={() => router.push("/tpmt/admin/sessions")}>
-          🛡️ Admin Area
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function Breadcrumb({ crumbs }) {
   const router = useRouter();
@@ -284,9 +278,6 @@ function Td({ children, style }) { return <td style={{ ...S.td, ...style }}>{chi
 
 const S = {
   page: { minHeight: "100vh", background: "#f0f2f5", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 14, color: "#1c1e21" },
-  header: { background: "#fff", borderBottom: "1px solid #ccd0d5", position: "sticky", top: 0, zIndex: 20 },
-  headerInner: { maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 48, display: "flex", alignItems: "center" },
-  adminBrand: { display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 800, color: "#1877f2", padding: 0 },
   infoBar: { background: "#fff", borderBottom: "1px solid #ccd0d5", padding: "0 0 16px" },
   container: { maxWidth: 1200, margin: "0 auto", padding: "0 24px 40px" },
   breadcrumb: { display: "flex", alignItems: "center", gap: 4, padding: "14px 0 12px", flexWrap: "wrap" },

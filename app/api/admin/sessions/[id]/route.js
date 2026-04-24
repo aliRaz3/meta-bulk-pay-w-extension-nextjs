@@ -54,9 +54,9 @@ export async function GET(request, { params }) {
       select: {
         id: true,
         name: true,
+        adAccountCount: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { adaccount: true } },
       },
     }),
   ]);

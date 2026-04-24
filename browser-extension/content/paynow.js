@@ -199,12 +199,15 @@
   // ── Communicate with background SW ────────────────────────────────────────
 
   function report(status, detail = '') {
-    chrome.runtime.sendMessage({
-      type: 'TAB_STATUS',
-      status,
-      detail,
-      url: window.location.href,
-    }).catch(() => { });
+    try {
+      if (!chrome.runtime?.id) return;
+      chrome.runtime.sendMessage({
+        type: 'TAB_STATUS',
+        status,
+        detail,
+        url: window.location.href,
+      }).catch(() => { });
+    } catch (_) { }
   }
 
   // Listen for the "GO" signal from the background SW
@@ -218,6 +221,8 @@
 
   // Auto-start: background SW may have already opened this tab with intent
   // Signal that we're ready so SW can send START_PAYNOW
-  chrome.runtime.sendMessage({ type: 'CONTENT_READY', url: window.location.href }).catch(() => { });
+  try {
+    chrome.runtime.sendMessage({ type: 'CONTENT_READY', url: window.location.href }).catch(() => { });
+  } catch (_) { }
 
 })();
