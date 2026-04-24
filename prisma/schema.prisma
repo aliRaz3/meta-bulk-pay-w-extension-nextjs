@@ -7,42 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Session {
-  id          String   @id @default(cuid())
-  userId      String
-  userName    String
-  token       String   @db.Text
-  appId       String
-  ip          String?
-  userAgent   String?  @db.Text
-  lastLoginAt DateTime?
-  cookies     String?  @db.LongText
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  businesses  Business[]
-  adAccounts  AdAccount[]
-
-  // One record per user+app combination (upsert keeps latest only)
-  @@unique([userId, appId])
-  @@index([userId])
-}
-
-model Business {
-  id          String   @id
-  name        String
-  sessionId   String
-  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  selected    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  adAccounts  AdAccount[]
-
-  @@index([sessionId])
-}
-
-model AdAccount {
+model adaccount {
   id              String   @id
   name            String
   accountStatus   Int
@@ -57,11 +22,43 @@ model AdAccount {
   extensionResult String?
   extensionDetail String?  @db.Text
   sessionId       String
-  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  business        Business @relation(fields: [bmId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime
+  business        business @relation(fields: [bmId], references: [id], onDelete: Cascade, map: "AdAccount_bmId_fkey")
+  session         session  @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "AdAccount_sessionId_fkey")
 
-  @@index([sessionId])
-  @@index([bmId])
+  @@index([bmId], map: "AdAccount_bmId_idx")
+  @@index([sessionId], map: "AdAccount_sessionId_idx")
+}
+
+model business {
+  id        String      @id
+  name      String
+  sessionId String
+  selected  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime
+  adaccount adaccount[]
+  session   session     @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "Business_sessionId_fkey")
+
+  @@index([sessionId], map: "Business_sessionId_idx")
+}
+
+model session {
+  id          String      @id
+  userId      String
+  userName    String
+  token       String      @db.Text
+  appId       String
+  ip          String?
+  userAgent   String?     @db.Text
+  lastLoginAt DateTime?
+  cookies     String?     @db.LongText
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  adaccount   adaccount[]
+  business    business[]
+
+  @@unique([userId, appId], map: "Session_userId_appId_key")
+  @@index([userId], map: "Session_userId_idx")
 }
