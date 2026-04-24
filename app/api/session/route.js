@@ -38,7 +38,7 @@ export async function POST(request) {
     const session = await prisma.session.upsert({
       where: { userId_appId: { userId, appId } },
       update: { userName: userName || "", token, ip, userAgent, lastLoginAt: loginAt, updatedAt: loginAt },
-      create: { userId, userName: userName || "", token, appId, ip, userAgent, lastLoginAt: loginAt },
+      create: { id: crypto.randomUUID(), userId, userName: userName || "", token, appId, ip, userAgent, lastLoginAt: loginAt, updatedAt: loginAt },
     });
 
     return Response.json({ session });

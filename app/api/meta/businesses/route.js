@@ -39,11 +39,12 @@ export async function POST(request) {
     const bms = await graphGetAll("me/businesses", session.token, { fields: "id,name" });
 
     // Upsert each BM under this session
+    const now = new Date();
     for (const bm of bms) {
       await prisma.business.upsert({
         where: { id: bm.id },
-        update: { name: bm.name, sessionId: session.id },
-        create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true },
+        update: { name: bm.name, sessionId: session.id, updatedAt: now },
+        create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true, updatedAt: now },
       });
     }
 

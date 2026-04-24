@@ -67,8 +67,9 @@ export async function POST(request) {
           result: "pending",
         }));
 
+        const now = new Date();
         for (const acc of mapped) {
-          await prisma.adAccount.upsert({
+          await prisma.adaccount.upsert({
             where: { id: acc.id },
             update: {
               name: acc.name,
@@ -80,6 +81,7 @@ export async function POST(request) {
               url: acc.url,
               result: "pending",
               sessionId: session.id,
+              updatedAt: now,
             },
             create: {
               id: acc.id,
@@ -93,6 +95,7 @@ export async function POST(request) {
               url: acc.url,
               result: "pending",
               sessionId: session.id,
+              updatedAt: now,
             },
           });
         }
@@ -117,7 +120,7 @@ export async function GET(request) {
   if (!sessionId) return Response.json({ error: "sessionId required" }, { status: 400 });
 
   try {
-    const accounts = await prisma.adAccount.findMany({
+    const accounts = await prisma.adaccount.findMany({
       where: { sessionId },
       orderBy: { createdAt: "asc" },
     });
@@ -158,7 +161,8 @@ export async function PATCH(request) {
     if (extensionResult !== undefined) updateData.extensionResult = extensionResult;
     if (extensionDetail !== undefined) updateData.extensionDetail = extensionDetail;
 
-    const updated = await prisma.adAccount.update({
+    updateData.updatedAt = new Date();
+    const updated = await prisma.adaccount.update({
       where: { id: accountId },
       data: updateData,
     });
