@@ -37,14 +37,11 @@ async function graphGetAll(path, token, params = {}) {
 export async function POST(request) {
   try {
     const { token, userId, bmIds, businesses } = await request.json();
-    console.log('userId', userId)
-    if (!token || !bmIds || bmIds.length === 0) {
-      return Response.json({ error: "token and bmIds required" }, { status: 400 });
+    if (!token || !userId || !bmIds || bmIds.length === 0) {
+      return Response.json({ error: "token, userId and bmIds required" }, { status: 400 });
     }
 
-    const session = userId
-      ? await prisma.session.findUnique({ where: { userId } })
-      : null;
+    const session = await prisma.session.findUnique({ where: { userId } });
 
     const bmsToProcess = businesses.filter((b) => bmIds.includes(b.id));
     const fetchResults = [];

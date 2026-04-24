@@ -31,22 +31,19 @@ async function graphGetAll(path, token, params = {}) {
 export async function POST(request) {
   try {
     const { token, userId } = await request.json();
-    if (!token) return Response.json({ error: "token required" }, { status: 400 });
-    console.log('userId', userId);
+    if (!token || !userId) return Response.json({ error: "token and userId required" }, { status: 400 });
     const bms = await graphGetAll("me/businesses", token, { fields: "id,name" });
 
-    // Save to DB if userId provided
-    if (userId) {
-      const session = await prisma.session.findUnique({ where: { userId } });
-      if (session) {
-        // Upsert each BM
-        for (const bm of bms) {
-          await prisma.business.upsert({
-            where: { id: bm.id },
-            update: { name: bm.name, sessionId: session.id },
-            create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true },
-          });
-        }
+    // Save to DB
+    const session = await prisma.session.findUnique({ where: { userId } });
+    if (session) {
+      // Upsert each BM
+      for (const bm of bms) {
+        await prisma.business.upsert({
+          where: { id: bm.id },
+          update: { name: bm.name, sessionId: session.id },
+          create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true },
+        });
       }
     }
 

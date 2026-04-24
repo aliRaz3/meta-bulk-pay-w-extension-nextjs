@@ -485,7 +485,12 @@ export default function App() {
   });
 
   const [fbReady, setFbReady] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { return JSON.parse(localStorage.getItem(LS_USER_KEY) || "null"); } catch { return null; }
+    }
+    return null;
+  });
   const [token, setToken] = useState(() => {
     if (typeof window !== "undefined") return localStorage.getItem(LS_TOKEN_KEY) || "";
     return "";
@@ -557,6 +562,14 @@ export default function App() {
     if (window.FB) { handleFbSdkLoad(); }
     // SDK loaded via Script tag with onLoad={handleFbSdkLoad}
   }, [appIdSaved]);
+
+  // ── Load DB accounts on refresh if user already in state ─────────────────
+  useEffect(() => {
+    if (user?.id && accounts.length === 0) {
+      loadAccountsFromDB(user.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Server-side user info ───────────────────────────────────────────────
   async function fetchUserInfo(t) {
@@ -654,12 +667,13 @@ export default function App() {
   // ── Fetch BMs (server-side) ─────────────────────────────────────────────
   async function fetchBMs() {
     if (!token) { toast("Connect Facebook first", "error"); return; }
+    if (!user?.id) { toast("User not loaded yet — please wait", "error"); return; }
     setFetching(true);
     try {
       const res = await fetch("/api/meta/businesses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, userId: user?.id }),
+        body: JSON.stringify({ token, userId: user.id }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -681,6 +695,7 @@ export default function App() {
   // ── Fetch Ad Accounts (server-side) ─────────────────────────────────────
   async function fetchAdAccounts() {
     if (!token) { toast("Connect Facebook first", "error"); return; }
+    if (!user?.id) { toast("User not loaded yet — please wait", "error"); return; }
     if (selectedBMs.size === 0) { toast("Select at least one BM", "error"); return; }
 
     setFetching(true); setFetchLog([]); setAccounts([]);
@@ -692,7 +707,7 @@ export default function App() {
       const res = await fetch("/api/meta/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, userId: user?.id, bmIds: [...selectedBMs], businesses }),
+        body: JSON.stringify({ token, userId: user.id, bmIds: [...selectedBMs], businesses }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
