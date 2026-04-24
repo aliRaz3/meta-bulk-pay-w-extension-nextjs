@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  userName    String
+  token       String   @db.Text
+  appId       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  businesses  Business[]
+  adAccounts  AdAccount[]
+}
+
+model Business {
+  id          String   @id
+  name        String
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  selected    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  adAccounts  AdAccount[]
+
+  @@index([sessionId])
+}
+
+model AdAccount {
+  id              String   @id
+  name            String
+  accountStatus   Int
+  currency        String   @default("USD")
+  balance         Float    @default(0)
+  disableReason   Int?
+  bmId            String
+  bmName          String
+  url             String   @db.Text
+  result          String   @default("pending")
+  paidVerified    Boolean  @default(false)
+  extensionResult String?
+  extensionDetail String?  @db.Text
+  sessionId       String
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  business        Business @relation(fields: [bmId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([bmId])
+}
