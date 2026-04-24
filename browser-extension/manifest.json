@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Meta Bulk Pay Now",
+  "version": "1.0.0",
+  "description": "Opens Meta billing pages in batches and clicks Pay Now automatically.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://business.facebook.com/*",
+    "https://*.pages.dev/*",
+    "https://meta-bulk-pay.vercel.app/*",
+    "http://localhost/*",
+    "https://localhost/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/sw.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://business.facebook.com/*"],
+      "js": ["content/paynow.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.pages.dev/*",
+        "https://meta-bulk-pay.vercel.app/*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*"
+      ],
+      "js": ["content/dashboard-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icons/icon48.png"
+  }
+}
