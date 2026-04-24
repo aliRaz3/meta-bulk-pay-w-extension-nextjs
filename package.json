@@ -10,6 +10,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
     "build:extension:release": "node scripts/build-extension-release.mjs"
   },
   "dependencies": {
