@@ -38,14 +38,19 @@ export async function POST(request) {
 
     const bms = await graphGetAll("me/businesses", session.token, { fields: "id,name" });
 
-    // Upsert each BM under this session
-    const now = new Date();
-    for (const bm of bms) {
-      await prisma.business.upsert({
-        where: { id: bm.id },
-        update: { name: bm.name, sessionId: session.id, updatedAt: now },
-        create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true, updatedAt: now },
-      });
+    if (bms.length > 0) {
+      const now = new Date();
+      const placeholders = bms.map(() => "(?,?,?,?,?,?)").join(",");
+      const values = bms.flatMap((bm) => [bm.id, bm.name, session.id, true, now, now]);
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO business (id, name, sessionId, selected, createdAt, updatedAt)
+         VALUES ${placeholders}
+         ON DUPLICATE KEY UPDATE
+           name      = VALUES(name),
+           sessionId = VALUES(sessionId),
+           updatedAt = VALUES(updatedAt)`,
+        ...values
+      );
     }
 
     return Response.json({ businesses: bms });

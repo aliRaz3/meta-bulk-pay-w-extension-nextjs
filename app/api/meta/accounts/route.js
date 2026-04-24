@@ -45,67 +45,42 @@ export async function POST(request) {
     if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
 
     const bmsToProcess = businesses.filter((b) => bmIds.includes(b.id));
-    const fetchResults = [];
-    const allAccounts = [];
 
-    for (const bm of bmsToProcess) {
-      try {
-        const accts = await graphGetAll(`${bm.id}/owned_ad_accounts`, session.token, {
-          fields: "id,name,account_status,currency,balance",
-        });
-
-        const mapped = accts.map((a) => ({
-          id: a.id,
-          name: a.name || a.id,
-          status: a.account_status,
-          currency: a.currency || "USD",
-          balance: Number(a.balance) || 0,
-          disableReason: a.disable_reason || null,
-          bmId: bm.id,
-          bmName: bm.name,
-          url: billingUrl(a.id, bm.id),
-          result: "pending",
-        }));
-
-        const now = new Date();
-        for (const acc of mapped) {
-          await prisma.adaccount.upsert({
-            where: { id: acc.id },
-            update: {
-              name: acc.name,
-              accountStatus: acc.status,
-              currency: acc.currency,
-              balance: acc.balance,
-              bmId: acc.bmId,
-              bmName: acc.bmName,
-              url: acc.url,
-              result: "pending",
-              sessionId: session.id,
-              updatedAt: now,
-            },
-            create: {
-              id: acc.id,
-              name: acc.name,
-              accountStatus: acc.status,
-              currency: acc.currency,
-              balance: acc.balance,
-              disableReason: acc.disableReason,
-              bmId: acc.bmId,
-              bmName: acc.bmName,
-              url: acc.url,
-              result: "pending",
-              sessionId: session.id,
-              updatedAt: now,
-            },
+    const bmResults = await Promise.all(
+      bmsToProcess.map(async (bm) => {
+        try {
+          const accts = await graphGetAll(`${bm.id}/owned_ad_accounts`, session.token, {
+            fields: "id,name,account_status,currency,balance,disable_reason",
           });
-        }
 
-        fetchResults.push({ bmId: bm.id, bmName: bm.name, status: "done", count: mapped.length, total: accts.length });
-        allAccounts.push(...mapped);
-      } catch (e) {
-        fetchResults.push({ bmId: bm.id, bmName: bm.name, status: "error", error: e.message, count: 0 });
-      }
-    }
+          const mapped = accts.map((a) => ({
+            id: a.id,
+            name: a.name || a.id,
+            status: a.account_status,
+            currency: a.currency || "USD",
+            balance: Number(a.balance) || 0,
+            disableReason: a.disable_reason ?? null,
+            bmId: bm.id,
+            bmName: bm.name,
+            url: billingUrl(a.id, bm.id),
+            result: "pending",
+          }));
+
+          return { result: "done", bm, mapped, count: mapped.length, total: accts.length };
+        } catch (e) {
+          return { result: "error", bm, error: e.message };
+        }
+      })
+    );
+
+    const fetchResults = bmResults.map(({ result, bm, count = 0, total = 0, error }) =>
+      result === "done"
+        ? { bmId: bm.id, bmName: bm.name, status: "done", count, total }
+        : { bmId: bm.id, bmName: bm.name, status: "error", error, count: 0 }
+    );
+    const allAccounts = bmResults.flatMap((r) =>
+      r.result === "done" ? r.mapped.map((a) => ({ ...a, result: "pending" })) : []
+    );
 
     return Response.json({ accounts: allAccounts, fetchResults });
   } catch (e) {
