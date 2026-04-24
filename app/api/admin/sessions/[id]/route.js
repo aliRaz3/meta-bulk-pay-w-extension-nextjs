@@ -56,7 +56,7 @@ export async function GET(request, { params }) {
         name: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { adAccounts: true } },
+        _count: { select: { adaccount: true } },
       },
     }),
   ]);

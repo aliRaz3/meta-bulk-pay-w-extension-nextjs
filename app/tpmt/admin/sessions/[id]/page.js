@@ -160,7 +160,7 @@ function SessionDetail() {
                         <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.createdAt).toLocaleString()}</Td>
                         <Td style={{ fontSize: 11, color: "#8d949e", whiteSpace: "nowrap" }}>{new Date(bm.updatedAt).toLocaleString()}</Td>
                         <Td><code style={S.mono}>{bm.id}</code></Td>
-                        <Td>{bm._count.adAccounts}</Td>
+                        <Td>{bm._count.adaccount}</Td>
                       </tr>
                     ))}
                   </tbody>

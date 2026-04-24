@@ -45,7 +45,7 @@ export async function GET(request) {
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { businesses: true, adAccounts: true } },
+        _count: { select: { business: true, adaccount: true } },
       },
     }),
   ]);

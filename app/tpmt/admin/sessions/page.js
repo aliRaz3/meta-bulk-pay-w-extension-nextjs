@@ -127,8 +127,8 @@ function SessionsTable() {
                     <Td><code style={S.mono}>{s.appId}</code></Td>
                     <Td>{s.ip || "—"}</Td>
                     <Td style={{ whiteSpace: "nowrap", fontSize: 11, color: "#8d949e" }}>{new Date(s.createdAt).toLocaleString()}</Td>
-                    <Td>{s._count.businesses}</Td>
-                    <Td>{s._count.adAccounts}</Td>
+                    <Td>{s._count.business}</Td>
+                    <Td>{s._count.adaccount}</Td>
                   </tr>
                 ))}
               </tbody>

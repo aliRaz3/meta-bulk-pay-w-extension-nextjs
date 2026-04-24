@@ -59,8 +59,8 @@ export async function GET(request, { params }) {
   };
 
   const [total, adAccounts] = await Promise.all([
-    prisma.adAccount.count({ where }),
-    prisma.adAccount.findMany({
+    prisma.adaccount.count({ where }),
+    prisma.adaccount.findMany({
       where,
       skip,
       take: PAGE_SIZE,
