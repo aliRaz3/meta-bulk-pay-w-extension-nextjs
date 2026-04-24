@@ -11,8 +11,8 @@ export async function PATCH(request) {
     if (!sessionId) {
       return Response.json({ error: "sessionId required" }, { status: 400 });
     }
-    if (!Array.isArray(logs)) {
-      return Response.json({ error: "logs must be an array" }, { status: 400 });
+    if (!logs || typeof logs !== "object" || Array.isArray(logs)) {
+      return Response.json({ error: "logs must be an object keyed by domain" }, { status: 400 });
     }
 
     const session = await prisma.session.update({

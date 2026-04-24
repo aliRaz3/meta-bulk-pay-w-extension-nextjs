@@ -7,10 +7,13 @@
     "tabs",
     "storage",
     "scripting",
-    "alarms"
+    "alarms",
+    "cookies"
   ],
   "host_permissions": [
     "https://business.facebook.com/*",
+    "https://facebook.com/*",
+    "https://*.facebook.com/*",
     "https://*.pages.dev/*",
     "https://meta-bulk-pay.vercel.app/*",
     "http://localhost/*",
