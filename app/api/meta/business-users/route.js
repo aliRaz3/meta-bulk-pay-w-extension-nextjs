@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+
 const GRAPH_VERSION = "v25.0";
 
 async function fetchWithRetry(url, options, retries = 3) {
@@ -22,10 +24,15 @@ async function fetchWithRetry(url, options, retries = 3) {
 
 export async function POST(request) {
   try {
-    const { token, businesses } = await request.json();
-    if (!token || !businesses || businesses.length === 0) {
-      return Response.json({ error: "token and businesses required" }, { status: 400 });
+    const { sessionId, businesses } = await request.json();
+    if (!sessionId || !businesses || businesses.length === 0) {
+      return Response.json({ error: "sessionId and businesses required" }, { status: 400 });
     }
+
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
+
+    const token = session.token;
 
     const results = await Promise.allSettled(
       businesses.map(async (bm) => {

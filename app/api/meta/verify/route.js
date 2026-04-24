@@ -4,13 +4,16 @@ const GRAPH_VERSION = "v25.0";
 
 export async function POST(request) {
   try {
-    const { token, accountId } = await request.json();
-    if (!token || !accountId) {
-      return Response.json({ error: "token and accountId required" }, { status: 400 });
+    const { sessionId, accountId } = await request.json();
+    if (!sessionId || !accountId) {
+      return Response.json({ error: "sessionId and accountId required" }, { status: 400 });
     }
 
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
+
     const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${accountId}`);
-    url.searchParams.set("access_token", token);
+    url.searchParams.set("access_token", session.token);
     url.searchParams.set("fields", "balance,currency,account_id,name,id,account_status");
 
     const res = await fetch(url.toString());

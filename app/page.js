@@ -8,7 +8,7 @@ import Script from "next/script";
 const GRAPH_VERSION = "v25.0";
 const LS_KEY = "meta_paynow_accounts";
 const LS_STATE_KEY = "meta_paynow_all_accounts";
-const LS_TOKEN_KEY = "meta_paynow_token";
+const LS_SESSION_KEY = "meta_paynow_session_id";
 const LS_EXTENSION_STATE_KEY = "meta_paynow_extension_state";
 const LS_USER_KEY = "meta_paynow_user";
 const EXTENSION_STATE_EVENT = "meta-paynow-extension-state";
@@ -491,9 +491,9 @@ export default function App() {
     }
     return null;
   });
-  const [token, setToken] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem(LS_TOKEN_KEY) || "";
-    return "";
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem(LS_SESSION_KEY) || null;
+    return null;
   });
 
   const [selectedStatuses, setSelectedStatuses] = useState([3]);
@@ -550,8 +550,6 @@ export default function App() {
     window.FB.getLoginStatus((r) => {
       if (r.status === "connected") {
         const t = r.authResponse.accessToken;
-        setToken(t);
-        localStorage.setItem(LS_TOKEN_KEY, t);
         fetchUserInfo(t);
       }
     });
@@ -563,41 +561,44 @@ export default function App() {
     // SDK loaded via Script tag with onLoad={handleFbSdkLoad}
   }, [appIdSaved]);
 
-  // ── Load DB accounts on refresh if user already in state ─────────────────
-  useEffect(() => {
-    if (user?.id && accounts.length === 0) {
-      loadAccountsFromDB(user.id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── Load DB accounts on refresh if sessionId already in localStorage ────────
+  // useEffect(() => {
+  //   if (sessionId && accounts.length === 0) {
+  //     loadAccountsFromDB(sessionId);
+  //   }
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, []);
 
   // ── Server-side user info ───────────────────────────────────────────────
-  async function fetchUserInfo(t) {
+  async function fetchUserInfo(token) {
     try {
       const res = await fetch("/api/meta/user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: t }),
+        body: JSON.stringify({ token }),
       });
       const data = await res.json();
       if (data.user) {
         setUser(data.user);
         localStorage.setItem(LS_USER_KEY, JSON.stringify(data.user));
-        // Save session to DB
-        await fetch("/api/session", {
+        // Upsert session in DB (one record per userId+appId), get back sessionId
+        const sessRes = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: data.user.id, userName: data.user.name, token: t, appId: localStorage.getItem("meta_app_id") || "" }),
+          body: JSON.stringify({ userId: data.user.id, userName: data.user.name, token, appId: localStorage.getItem("meta_app_id") || "" }),
         });
-        // Try to load existing accounts from DB
-        await loadAccountsFromDB(data.user.id);
+        const sessData = await sessRes.json();
+        if (sessData.session?.id) {
+          setSessionId(sessData.session.id);
+          localStorage.setItem(LS_SESSION_KEY, sessData.session.id);
+        }
       }
     } catch (e) { console.error(e); }
   }
 
-  async function loadAccountsFromDB(userId) {
+  async function loadAccountsFromDB(sid) {
     try {
-      const res = await fetch(`/api/meta/accounts?userId=${userId}`);
+      const res = await fetch(`/api/meta/accounts?sessionId=${sid}`);
       const data = await res.json();
       if (data.accounts && data.accounts.length > 0) {
         setAccounts(data.accounts);
@@ -615,7 +616,6 @@ export default function App() {
         if (r.authResponse) {
           const t = r.authResponse.accessToken;
           setToken(t);
-          localStorage.setItem(LS_TOKEN_KEY, t);
           fetchUserInfo(t);
           toast("Connected to Facebook", "success");
         } else {
@@ -629,14 +629,10 @@ export default function App() {
   function handleLogout() {
     if (window.FB) window.FB.logout(() => {});
     void clearRunnerStatsAndLogs();
-    if (user?.id) {
-      fetch(`/api/session?userId=${user.id}`, { method: "DELETE" });
-      fetch(`/api/meta/accounts?userId=${user.id}`, { method: "DELETE" });
-    }
-    setToken(""); setUser(null);
-    localStorage.removeItem(LS_TOKEN_KEY);
+    setUser(null); setSessionId(null);
     localStorage.removeItem(LS_EXTENSION_STATE_KEY);
     localStorage.removeItem(LS_USER_KEY);
+    localStorage.removeItem(LS_SESSION_KEY);
     setAccounts([]); localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_STATE_KEY);
     setFetchLog([]);
     setBusinesses([]); setSelectedBMs(new Set()); setBmsFetched(false);
@@ -645,18 +641,15 @@ export default function App() {
   }
 
   function handleResetApp() {
-    const confirmed = window.confirm("Reset the app and clear saved App ID, token, and cached accounts?");
+    const confirmed = window.confirm("Reset the app and clear saved App ID, Session, and cached accounts?");
     if (!confirmed) return;
     if (window.FB) window.FB.logout(() => {});
     void clearRunnerStatsAndLogs();
-    if (user?.id) {
-      fetch(`/api/session?userId=${user.id}`, { method: "DELETE" });
-      fetch(`/api/meta/accounts?userId=${user.id}`, { method: "DELETE" });
-    }
-    localStorage.removeItem("meta_app_id"); localStorage.removeItem(LS_TOKEN_KEY);
+    localStorage.removeItem("meta_app_id");
     localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_STATE_KEY);
     localStorage.removeItem(LS_EXTENSION_STATE_KEY); localStorage.removeItem(LS_USER_KEY);
-    setAppId(""); setAppIdSaved(false); setFbReady(false); setUser(null); setToken("");
+    localStorage.removeItem(LS_SESSION_KEY);
+    setAppId(""); setAppIdSaved(false); setFbReady(false); setUser(null); setSessionId(null);
     setSelectedStatuses([3]); setBusinesses([]); setSelectedBMs(new Set()); setBmsFetched(false);
     setFetching(false); setFetchLog([]); setAccounts([]);
     setSearch(""); setUnselected(new Set()); setExtensionLiveState(null); setFilterHasBalance(true);
@@ -666,14 +659,13 @@ export default function App() {
 
   // ── Fetch BMs (server-side) ─────────────────────────────────────────────
   async function fetchBMs() {
-    if (!token) { toast("Connect Facebook first", "error"); return; }
-    if (!user?.id) { toast("User not loaded yet — please wait", "error"); return; }
+    if (!sessionId) { toast("Session not ready — please wait", "error"); return; }
     setFetching(true);
     try {
       const res = await fetch("/api/meta/businesses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, userId: user.id }),
+        body: JSON.stringify({ sessionId }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -694,8 +686,7 @@ export default function App() {
 
   // ── Fetch Ad Accounts (server-side) ─────────────────────────────────────
   async function fetchAdAccounts() {
-    if (!token) { toast("Connect Facebook first", "error"); return; }
-    if (!user?.id) { toast("User not loaded yet — please wait", "error"); return; }
+    if (!sessionId) { toast("Session not ready — please wait", "error"); return; }
     if (selectedBMs.size === 0) { toast("Select at least one BM", "error"); return; }
 
     setFetching(true); setFetchLog([]); setAccounts([]);
@@ -707,7 +698,7 @@ export default function App() {
       const res = await fetch("/api/meta/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, userId: user.id, bmIds: [...selectedBMs], businesses }),
+        body: JSON.stringify({ sessionId, bmIds: [...selectedBMs], businesses }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -734,7 +725,7 @@ export default function App() {
     window.open(acc.url, "_blank");
     const updated = { ...acc, result: "opened" };
     setAccounts((prev) => prev.map((a) => (a.id === acc.id ? updated : a)));
-    if (user?.id) {
+    if (sessionId) {
       fetch("/api/meta/accounts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -768,7 +759,7 @@ export default function App() {
     assignUsersByBm, selectedAssignUserByBm, setSelectedAssignUserByBm,
     assignUsersLoading, assignUsersError, assignBms, hasBmSelectionForAll,
     openAssignModal, confirmAssignSelected, closeAssignModal, resetAddUserState,
-  } = useAddUserToAdAccounts({ effectivelySelected, token, graphVersion: GRAPH_VERSION, toast });
+  } = useAddUserToAdAccounts({ effectivelySelected, sessionId, graphVersion: GRAPH_VERSION, toast });
 
   // ── Extension event listeners ────────────────────────────────────────
   useEffect(() => {
@@ -880,7 +871,7 @@ export default function App() {
       })
     );
 
-    if (!token) return;
+    if (!sessionId) return;
 
     extensionAccounts.forEach((extAccount) => {
       if (!successResults.has(extAccount.result) || !extAccount.id) return;
@@ -896,7 +887,7 @@ export default function App() {
       fetch("/api/meta/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, accountId: extAccount.id }),
+        body: JSON.stringify({ sessionId, accountId: extAccount.id }),
       })
         .then((res) => res.json())
         .then((apiAccount) => {
@@ -915,7 +906,7 @@ export default function App() {
           ));
         });
     });
-  }, [extensionLiveState?.accounts, token, userActivityEpoch]);
+  }, [extensionLiveState?.accounts, sessionId, userActivityEpoch]);
 
   async function runExtensionCommand(type, payload = {}, successMessage = "") {
     setRunnerBusy(true);
@@ -1025,7 +1016,7 @@ export default function App() {
     setSelectedStatuses(statusValue === "all" ? ["all"] : [Number(statusValue)]);
   }
 
-  const step = !appIdSaved ? 0 : !token ? 1 : accounts.length === 0 ? 2 : 3;
+  const step = !appIdSaved ? 0 : !sessionId ? 1 : accounts.length === 0 ? 2 : 3;
 
   return (
     <>
@@ -1059,7 +1050,7 @@ export default function App() {
                 </div>
               )}
               <button className="btn btn-danger btn-sm" onClick={handleResetApp}>Reset App</button>
-              {token && <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Disconnect</button>}
+              {sessionId && <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Disconnect</button>}
             </div>
           </div>
         </div>
@@ -1099,7 +1090,7 @@ export default function App() {
         )}
 
         {/* Step 1 — Login */}
-        {appIdSaved && !token && (
+        {appIdSaved && !sessionId && (
           <div className="card" style={{ maxWidth: 480, margin: "0 auto", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>🔐</div>
             <div className="card-title" style={{ justifyContent: "center" }}>Connect Facebook Account</div>
@@ -1117,7 +1108,7 @@ export default function App() {
         )}
 
         {/* Step 2 — Select BMs */}
-        {appIdSaved && token && accounts.length === 0 && !fetching && (
+        {appIdSaved && sessionId && accounts.length === 0 && !fetching && (
           <div className="card" style={{ maxWidth: 620, margin: "0 auto" }}>
             {!bmsFetched ? (
               <>

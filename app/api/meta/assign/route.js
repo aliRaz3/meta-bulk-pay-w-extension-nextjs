@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+
 const GRAPH_VERSION = "v25.0";
 
 const RETRYABLE_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -26,21 +28,24 @@ async function fetchWithRetry(url, options, retries = 3) {
 
 export async function POST(request) {
   try {
-    const { token, adAccountId, businessId, selectedUserId } = await request.json();
+    const { sessionId, adAccountId, businessId, selectedUserId } = await request.json();
 
-    if (!token || !adAccountId || !businessId || !selectedUserId) {
+    if (!sessionId || !adAccountId || !businessId || !selectedUserId) {
       return Response.json(
-        { error: "token, adAccountId, businessId, selectedUserId required" },
+        { error: "sessionId, adAccountId, businessId, selectedUserId required" },
         { status: 400 }
       );
     }
+
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
 
     const assignEndpoint = `https://graph.facebook.com/${GRAPH_VERSION}/${adAccountId}/assigned_users`;
     const assignPayload = {
       user: selectedUserId,
       tasks: ["MANAGE", "ADVERTISE", "ANALYZE"],
       business: businessId,
-      access_token: token,
+      access_token: session.token,
     };
 
     const assignResponse = await fetchWithRetry(assignEndpoint, {

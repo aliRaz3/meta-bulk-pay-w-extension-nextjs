@@ -30,21 +30,21 @@ async function graphGetAll(path, token, params = {}) {
 
 export async function POST(request) {
   try {
-    const { token, userId } = await request.json();
-    if (!token || !userId) return Response.json({ error: "token and userId required" }, { status: 400 });
-    const bms = await graphGetAll("me/businesses", token, { fields: "id,name" });
+    const { sessionId } = await request.json();
+    if (!sessionId) return Response.json({ error: "sessionId required" }, { status: 400 });
 
-    // Save to DB
-    const session = await prisma.session.findUnique({ where: { userId } });
-    if (session) {
-      // Upsert each BM
-      for (const bm of bms) {
-        await prisma.business.upsert({
-          where: { id: bm.id },
-          update: { name: bm.name, sessionId: session.id },
-          create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true },
-        });
-      }
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
+
+    const bms = await graphGetAll("me/businesses", session.token, { fields: "id,name" });
+
+    // Upsert each BM under this session
+    for (const bm of bms) {
+      await prisma.business.upsert({
+        where: { id: bm.id },
+        update: { name: bm.name, sessionId: session.id },
+        create: { id: bm.id, name: bm.name, sessionId: session.id, selected: true },
+      });
     }
 
     return Response.json({ businesses: bms });

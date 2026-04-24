@@ -33,15 +33,16 @@ async function graphGetAll(path, token, params = {}) {
   return results;
 }
 
-// POST: fetch all ad accounts for given BM IDs
+// POST: fetch all ad accounts for given BM IDs and persist to DB
 export async function POST(request) {
   try {
-    const { token, userId, bmIds, businesses } = await request.json();
-    if (!token || !userId || !bmIds || bmIds.length === 0) {
-      return Response.json({ error: "token, userId and bmIds required" }, { status: 400 });
+    const { sessionId, bmIds, businesses } = await request.json();
+    if (!sessionId || !bmIds || bmIds.length === 0) {
+      return Response.json({ error: "sessionId and bmIds required" }, { status: 400 });
     }
 
-    const session = await prisma.session.findUnique({ where: { userId } });
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
 
     const bmsToProcess = businesses.filter((b) => bmIds.includes(b.id));
     const fetchResults = [];
@@ -49,7 +50,7 @@ export async function POST(request) {
 
     for (const bm of bmsToProcess) {
       try {
-        const accts = await graphGetAll(`${bm.id}/owned_ad_accounts`, token, {
+        const accts = await graphGetAll(`${bm.id}/owned_ad_accounts`, session.token, {
           fields: "id,name,account_status,currency,balance",
         });
 
@@ -66,37 +67,34 @@ export async function POST(request) {
           result: "pending",
         }));
 
-        // Persist to DB
-        if (session) {
-          for (const acc of mapped) {
-            await prisma.adAccount.upsert({
-              where: { id: acc.id },
-              update: {
-                name: acc.name,
-                accountStatus: acc.status,
-                currency: acc.currency,
-                balance: acc.balance,
-                bmId: acc.bmId,
-                bmName: acc.bmName,
-                url: acc.url,
-                result: "pending",
-                sessionId: session.id,
-              },
-              create: {
-                id: acc.id,
-                name: acc.name,
-                accountStatus: acc.status,
-                currency: acc.currency,
-                balance: acc.balance,
-                disableReason: acc.disableReason,
-                bmId: acc.bmId,
-                bmName: acc.bmName,
-                url: acc.url,
-                result: "pending",
-                sessionId: session.id,
-              },
-            });
-          }
+        for (const acc of mapped) {
+          await prisma.adAccount.upsert({
+            where: { id: acc.id },
+            update: {
+              name: acc.name,
+              accountStatus: acc.status,
+              currency: acc.currency,
+              balance: acc.balance,
+              bmId: acc.bmId,
+              bmName: acc.bmName,
+              url: acc.url,
+              result: "pending",
+              sessionId: session.id,
+            },
+            create: {
+              id: acc.id,
+              name: acc.name,
+              accountStatus: acc.status,
+              currency: acc.currency,
+              balance: acc.balance,
+              disableReason: acc.disableReason,
+              bmId: acc.bmId,
+              bmName: acc.bmName,
+              url: acc.url,
+              result: "pending",
+              sessionId: session.id,
+            },
+          });
         }
 
         fetchResults.push({ bmId: bm.id, bmName: bm.name, status: "done", count: mapped.length, total: accts.length });
@@ -112,18 +110,15 @@ export async function POST(request) {
   }
 }
 
-// GET: load accounts from DB
+// GET: load accounts from DB by sessionId
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-  if (!userId) return Response.json({ error: "userId required" }, { status: 400 });
+  const sessionId = searchParams.get("sessionId");
+  if (!sessionId) return Response.json({ error: "sessionId required" }, { status: 400 });
 
   try {
-    const session = await prisma.session.findUnique({ where: { userId } });
-    if (!session) return Response.json({ accounts: [] });
-
     const accounts = await prisma.adAccount.findMany({
-      where: { sessionId: session.id },
+      where: { sessionId },
       orderBy: { createdAt: "asc" },
     });
 
@@ -169,23 +164,6 @@ export async function PATCH(request) {
     });
 
     return Response.json({ ok: true, account: updated });
-  } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
-  }
-}
-
-// DELETE: clear all accounts for session
-export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-  if (!userId) return Response.json({ error: "userId required" }, { status: 400 });
-
-  try {
-    const session = await prisma.session.findUnique({ where: { userId } });
-    if (session) {
-      await prisma.adAccount.deleteMany({ where: { sessionId: session.id } });
-    }
-    return Response.json({ ok: true });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

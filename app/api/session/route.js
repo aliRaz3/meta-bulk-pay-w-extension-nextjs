@@ -1,19 +1,21 @@
 import { prisma } from "@/lib/prisma";
 
+// GET /api/session?sessionId=xxx  — verify session exists
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-  if (!userId) {
-    return Response.json({ error: "userId required" }, { status: 400 });
+  const sessionId = searchParams.get("sessionId");
+  if (!sessionId) {
+    return Response.json({ error: "sessionId required" }, { status: 400 });
   }
   try {
-    const session = await prisma.session.findUnique({ where: { userId } });
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
     return Response.json({ session });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }
 }
 
+// POST /api/session  — upsert latest session for userId+appId, return sessionId
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -21,26 +23,22 @@ export async function POST(request) {
     if (!userId || !token || !appId) {
       return Response.json({ error: "userId, token, appId required" }, { status: 400 });
     }
-    const session = await prisma.session.upsert({
-      where: { userId },
-      update: { userName: userName || "", token, appId, updatedAt: new Date() },
-      create: { userId, userName: userName || "", token, appId },
-    });
-    return Response.json({ session });
-  } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
-  }
-}
 
-export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-  if (!userId) {
-    return Response.json({ error: "userId required" }, { status: 400 });
-  }
-  try {
-    await prisma.session.deleteMany({ where: { userId } });
-    return Response.json({ ok: true });
+    // Capture IP and User-Agent for audit logging
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      null;
+    const userAgent = request.headers.get("user-agent") || null;
+
+    // Upsert: one record per userId+appId combination, always up-to-date
+    const session = await prisma.session.upsert({
+      where: { userId_appId: { userId, appId } },
+      update: { userName: userName || "", token, ip, userAgent, updatedAt: new Date() },
+      create: { userId, userName: userName || "", token, appId, ip, userAgent },
+    });
+
+    return Response.json({ session });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

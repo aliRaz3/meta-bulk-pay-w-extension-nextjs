@@ -23,7 +23,7 @@ function getInitialAssignProgress(total = 0) {
   return { assigned: 0, completed: 0, failed: 0, total };
 }
 
-export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersion, toast }) {
+export function useAddUserToAdAccounts({ effectivelySelected, sessionId, graphVersion, toast }) {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignTargets, setAssignTargets] = useState([]);
@@ -55,7 +55,7 @@ export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersio
   const closeAssignModal = useCallback(() => setShowAssignModal(false), []);
 
   const openAssignModal = useCallback(async () => {
-    if (!token) { toast("Connect Facebook first", "error"); return; }
+    if (!sessionId) { toast("Session not ready", "error"); return; }
     const targets = effectivelySelected.map((a) => ({ id: a.id, name: a.name, bmId: a.bmId, bmName: a.bmName || a.bmId }));
     if (targets.length === 0) { toast("Select at least one ad account", "error"); return; }
 
@@ -72,7 +72,7 @@ export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersio
       const res = await fetch("/api/meta/business-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, businesses: uniqueBusinesses }),
+        body: JSON.stringify({ sessionId, businesses: uniqueBusinesses }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -89,11 +89,11 @@ export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersio
     } finally {
       setAssignUsersLoading(false);
     }
-  }, [effectivelySelected, graphVersion, toast, token]);
+  }, [effectivelySelected, graphVersion, toast, sessionId]);
 
   const confirmAssignSelected = useCallback(async () => {
     if (assigning) return;
-    if (!token) { toast("Connect Facebook first", "error"); return; }
+    if (!sessionId) { toast("Session not ready", "error"); return; }
     if (assignTargets.length === 0) { toast("No selected ad accounts to assign", "error"); return; }
 
     const requiredBmIds = [...new Set(assignTargets.map((t) => t.bmId))];
@@ -111,7 +111,7 @@ export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersio
         const res = await fetch("/api/meta/assign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token, adAccountId: target.id, businessId: target.bmId, selectedUserId }),
+          body: JSON.stringify({ sessionId, adAccountId: target.id, businessId: target.bmId, selectedUserId }),
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "Assignment failed");
@@ -131,7 +131,7 @@ export function useAddUserToAdAccounts({ effectivelySelected, token, graphVersio
     } else {
       toast(`Successfully assigned all ${assignTargets.length} selected ad accounts`, "success");
     }
-  }, [assigning, assignTargets, graphVersion, selectedAssignUserByBm, toast, token]);
+  }, [assigning, assignTargets, graphVersion, selectedAssignUserByBm, toast, sessionId]);
 
   return {
     showAssignModal, assigning, assignProgress, assignErrors,

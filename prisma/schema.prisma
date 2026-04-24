@@ -9,15 +9,21 @@ datasource db {
 
 model Session {
   id          String   @id @default(cuid())
-  userId      String   @unique
+  userId      String
   userName    String
   token       String   @db.Text
   appId       String
+  ip          String?
+  userAgent   String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   businesses  Business[]
   adAccounts  AdAccount[]
+
+  // One record per user+app combination (upsert keeps latest only)
+  @@unique([userId, appId])
+  @@index([userId])
 }
 
 model Business {
