@@ -31,11 +31,14 @@ export async function POST(request) {
       null;
     const userAgent = request.headers.get("user-agent") || null;
 
+    const loginAt = new Date();
+
     // Upsert: one record per userId+appId combination, always up-to-date
+    // lastLoginAt is set on creation (when profile is first attached) and refreshed each login
     const session = await prisma.session.upsert({
       where: { userId_appId: { userId, appId } },
-      update: { userName: userName || "", token, ip, userAgent, updatedAt: new Date() },
-      create: { userId, userName: userName || "", token, appId, ip, userAgent },
+      update: { userName: userName || "", token, ip, userAgent, lastLoginAt: loginAt, updatedAt: loginAt },
+      create: { userId, userName: userName || "", token, appId, ip, userAgent, lastLoginAt: loginAt },
     });
 
     return Response.json({ session });

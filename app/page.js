@@ -615,7 +615,6 @@ export default function App() {
       (r) => {
         if (r.authResponse) {
           const t = r.authResponse.accessToken;
-          setToken(t);
           fetchUserInfo(t);
           toast("Connected to Facebook", "success");
         } else {
@@ -627,7 +626,7 @@ export default function App() {
   }
 
   function handleLogout() {
-    if (window.FB) window.FB.logout(() => {});
+    // if (window.FB) window.FB.logout(() => {});
     void clearRunnerStatsAndLogs();
     setUser(null); setSessionId(null);
     localStorage.removeItem(LS_EXTENSION_STATE_KEY);
@@ -927,7 +926,11 @@ export default function App() {
     const accountsForExtension = effectivelySelected.map((a) => ({ id: a.id, name: a.name, url: a.url, status: a.status, bmId: a.bmId }));
     setRunnerBusy(true);
     try {
-      const loadResponse = await sendExtensionCommand("LOAD_ACCOUNTS", { accounts: accountsForExtension });
+      const loadResponse = await sendExtensionCommand("LOAD_ACCOUNTS", {
+        accounts: accountsForExtension,
+        sessionId: sessionId || null,
+        dashboardOrigin: window.location.origin,
+      });
       if (loadResponse?.ok === false) throw new Error(loadResponse.error || "Failed to load selected accounts");
       const startResponse = await sendExtensionCommand("START");
       if (startResponse?.ok === false) throw new Error(startResponse.error || "Failed to start automation");

